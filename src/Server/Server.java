@@ -12,9 +12,12 @@ public class Server
     static int ClientCount = 0;
     
     private Socket socket = null;
+    private DatagramSocket dsocket = null;
     private ServerSocket server = null;
     private DataInputStream in = null;
     private DataOutputStream out = null;
+    private FileInputStream fis = null;
+    private FileOutputStream fos = null;
  
     public Server(int port)
     {
@@ -44,6 +47,7 @@ public class Server
 
                         in = new DataInputStream(socket.getInputStream());
                         out = new DataOutputStream(socket.getOutputStream());
+                        
 
                         String Name = "";
                         Boolean nameDist = true;
@@ -66,7 +70,7 @@ public class Server
                         }
                         System.out.println("Creating a new handler for this client...");
 
-                        ClientHandler cl = new ClientHandler(socket, Name, in, out, RoomList);
+                        ClientHandler cl = new ClientHandler(socket, dsocket , Name, in, out, RoomList, fis, fos);
                         //Thread th = new Thread(cl);
                         cl.RoomLobby();
 
@@ -151,20 +155,27 @@ class ClientHandler
     private String name;
     final DataInputStream dis;
     final DataOutputStream dos;
+    final FileInputStream fis;
+    final FileOutputStream fos;
     private String room;
     Vector <Room> RoomList;
     Socket s;
+    DatagramSocket ds;
     boolean isloggedin;
      
-    public ClientHandler(Socket s, String name,
-                            DataInputStream dis, DataOutputStream dos, Vector <Room> RoomList) {
+    public ClientHandler(Socket s, DatagramSocket ds, String name,
+                            DataInputStream dis, DataOutputStream dos, Vector <Room> RoomList, 
+                            FileInputStream fis, FileOutputStream fos) {
         this.dis = dis;
         this.dos = dos;
         this.name = name;
         this.s = s;
         this.isloggedin = true;
         this.room = "lobby";
-        this.RoomList = RoomList;    
+        this.RoomList = RoomList;
+        this.fis = fis;
+        this.fos = fos;
+        this.ds = ds;
     }
  
     public String GetName()
