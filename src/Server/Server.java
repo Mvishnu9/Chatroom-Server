@@ -69,7 +69,7 @@ public class Server
 
                         ClientHandler cl = new ClientHandler(socket, Name, in, out, RoomList);
                         //Thread th = new Thread(cl);
-                        cl.test();
+                        cl.RoomLobby();
 
                         ClientList.add(cl);
                         //th.start();
@@ -120,7 +120,7 @@ public class Server
 class Room
 {
     private String name;
-    static Vector <ClientHandler> ClientList;
+    Vector <ClientHandler> ClientList;
     
     public Room(String name)
     {
@@ -148,6 +148,7 @@ class Room
 class ClientHandler
 {
     Scanner scn = new Scanner(System.in);
+    ClientHandler thisCL = this;
     private String name;
     final DataInputStream dis;
     final DataOutputStream dos;
@@ -172,62 +173,81 @@ class ClientHandler
         return this.name;
     }
     
-//    Thread DecideRoom = new Thread(new Runnable()
-//    {
-//        @Override
-//        public void run()
-//        {        
-//            while(room.equals("lobby"))
-//            {
-//                try
-//                {
-//                    dos.writeUTF("Select one of the following commands:");
-//                    dos.writeUTF("1) LIST - Displays list of currenlty active chat rooms");
-//                    dos.writeUTF("2) CREATE - Create a new chat room and enter it");
-//                    dos.writeUTF("3) ENTER <Name of chat room> - Enter an existing chat room");
-//                    String received;
-//                    received = dis.readUTF();
-//                    StringTokenizer st = new StringTokenizer(received);
-//                    String tok = st.nextToken();
-//                    if(tok.equals("LIST"))
-//                    {
-//                       dos.writeUTF("Typed LIST");
-//                       for(Room room: RoomList)
-//                       {
-//                           dos.writeUTF(room.GetName());                      
-//                       }
-//                    }
-//                    else if(tok.equals("CREATE"))
-//                    {
-//                        dos.writeUTF("Please Enter Name of the new Room");
-//                        String newrname = dis.readUTF();
-//                        Room newroom = new Room(newrname);
-//                        newroom.AddClient(this);
-//                        
-//
-//                    }
-//                    else if(tok.equals("ENTER"))
-//                    {
-//
-//                    }
-//                }
-//                catch(IOException i)
-//                {
-//                    i.printStackTrace();
-//                }
-//            }
-//            Exec.start();
-//            return;     
-//        }
-//    });
-    
-    void test()
+    public void Exec() 
     {
-        ClientHandler CLo = this;
-        class tryout implements Runnable
+        String received;
+        String rname = thisCL.room;
+
+        Room thisRoom = RoomList.firstElement();
+        Iterator <Room> Iter = RoomList.iterator();
+        while(Iter.hasNext())
+        {
+            Room cRoom = Iter.next();
+            if(rname.equals(cRoom.GetName()))
+            {
+                thisRoom = cRoom;
+                break;
+            }
+        }
+
+        while (true) 
+        {
+            try
+            {
+                received = dis.readUTF();
+
+                System.out.println(name+": "+received);
+
+                if(received.equals("logout"))
+                {
+                    for (ClientHandler cl : thisRoom.ClientList)
+                    {
+                        if(cl.isloggedin)
+                            cl.dos.writeUTF(name+" has logged out");
+                    }
+                    isloggedin = false;
+                    s.close();
+                    break;
+                }
+                for (ClientHandler cl : thisRoom.ClientList)
+                {
+                    cl.dos.writeUTF(name+" : "+received);
+                }
+
+            }
+            catch(EOFException e)
+            {
+                System.out.println("No clients present");
+                return;
+            }
+            catch(IOException i)
+            {
+                i.printStackTrace();
+            }
+            catch(Exception ex)
+            {
+                ex.printStackTrace();
+            }
+        }
+
+        try
+        {
+            dis.close();
+            dos.close();
+            return;             
+        }
+        catch(IOException i)
+        {
+            i.printStackTrace();                    
+        }
+    }
+    
+    void RoomLobby()
+    {
+        class Lobby implements Runnable
         {            
             ClientHandler CL;
-            public tryout(ClientHandler cl)
+            public Lobby(ClientHandler cl)
             {
                 CL = cl;
             }
@@ -258,15 +278,26 @@ class ClientHandler
                             dos.writeUTF("Please Enter Name of the new Room");
                             String newrname = dis.readUTF();
                             Room newroom = new Room(newrname);
-                            newroom.AddClient(CL);
+                            //newroom.AddClient(CL);
                             RoomList.add(newroom);
 
                         }
                         else if(tok.equals("ENTER"))
                         {
                             String roomname = st.nextToken();
-                            
-
+                            CL.room = roomname;
+                            Room thisRoom = RoomList.firstElement();
+                            Iterator <Room> Iter = RoomList.iterator();
+                            while(Iter.hasNext())
+                            {
+                                Room cRoom = Iter.next();
+                                if(roomname.equals(cRoom.GetName()))
+                                {
+                                    thisRoom = cRoom;
+                                    break;
+                                }
+                            }
+                            thisRoom.AddClient(CL);                           
                         }
                         else if(tok.equals("logout"))
                         {
@@ -285,66 +316,12 @@ class ClientHandler
                         i.printStackTrace();
                     }
                 }
-                Exec.start();
+                Exec();
                 return;     
             }
         }
-        Thread t = new Thread(new tryout(CLo));
+        Thread t = new Thread(new Lobby(thisCL));
         t.start();
     }
     
-    Thread Exec = new Thread(new Runnable() 
-    {
-        @Override
-        public void run() 
-        {
-            String received;
-            while (true) 
-            {
-                try
-                {
-                    received = dis.readUTF();
-
-                    System.out.println(name+": "+received);
-
-                    if(received.equals("logout"))
-                    {
-                        for (ClientHandler cl : Server.ClientList)
-                        {
-                            if(cl.isloggedin)
-                                cl.dos.writeUTF(name+" has logged out");
-                        }
-                        isloggedin = false;
-                        s.close();
-                        break;
-                    }
-                    for (ClientHandler cl : Server.ClientList)
-                    {
-                        cl.dos.writeUTF(name+" : "+received);
-                    }
-
-                }
-                catch(EOFException e)
-                {
-                    System.out.println("No clients present");
-                    return;
-                }
-                catch(IOException i)
-                {
-                    i.printStackTrace();
-                }             
-            }
-
-            try
-            {
-                dis.close();
-                dos.close();
-                return;             
-            }
-            catch(IOException i)
-            {
-                i.printStackTrace();                    
-            }
-        }
-    });
 }
