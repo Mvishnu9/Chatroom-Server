@@ -67,9 +67,9 @@ public class Server
                         }
                         System.out.println("Creating a new handler for this client...");
 
-                        ClientHandler cl = new ClientHandler(socket, Name, in, out);
+                        ClientHandler cl = new ClientHandler(socket, Name, in, out, RoomList);
                         //Thread th = new Thread(cl);
-                        cl.DecideRoom.start();
+                        cl.test();
 
                         ClientList.add(cl);
                         //th.start();
@@ -125,6 +125,12 @@ class Room
     public Room(String name)
     {
         this.name = name;
+        this.ClientList = new Vector<>();
+    }
+    
+    public String GetName()
+    {
+        return(this.name);
     }
     
     public void AddClient(ClientHandler cl)
@@ -146,18 +152,19 @@ class ClientHandler
     final DataInputStream dis;
     final DataOutputStream dos;
     private String room;
+    Vector <Room> RoomList;
     Socket s;
     boolean isloggedin;
      
     public ClientHandler(Socket s, String name,
-                            DataInputStream dis, DataOutputStream dos) {
+                            DataInputStream dis, DataOutputStream dos, Vector <Room> RoomList) {
         this.dis = dis;
         this.dos = dos;
         this.name = name;
         this.s = s;
-        this.isloggedin=true;
+        this.isloggedin = true;
         this.room = "lobby";
-        
+        this.RoomList = RoomList;    
     }
  
     public String GetName()
@@ -165,43 +172,126 @@ class ClientHandler
         return this.name;
     }
     
-    Thread DecideRoom = new Thread(new Runnable()
+//    Thread DecideRoom = new Thread(new Runnable()
+//    {
+//        @Override
+//        public void run()
+//        {        
+//            while(room.equals("lobby"))
+//            {
+//                try
+//                {
+//                    dos.writeUTF("Select one of the following commands:");
+//                    dos.writeUTF("1) LIST - Displays list of currenlty active chat rooms");
+//                    dos.writeUTF("2) CREATE - Create a new chat room and enter it");
+//                    dos.writeUTF("3) ENTER <Name of chat room> - Enter an existing chat room");
+//                    String received;
+//                    received = dis.readUTF();
+//                    StringTokenizer st = new StringTokenizer(received);
+//                    String tok = st.nextToken();
+//                    if(tok.equals("LIST"))
+//                    {
+//                       dos.writeUTF("Typed LIST");
+//                       for(Room room: RoomList)
+//                       {
+//                           dos.writeUTF(room.GetName());                      
+//                       }
+//                    }
+//                    else if(tok.equals("CREATE"))
+//                    {
+//                        dos.writeUTF("Please Enter Name of the new Room");
+//                        String newrname = dis.readUTF();
+//                        Room newroom = new Room(newrname);
+//                        newroom.AddClient(this);
+//                        
+//
+//                    }
+//                    else if(tok.equals("ENTER"))
+//                    {
+//
+//                    }
+//                }
+//                catch(IOException i)
+//                {
+//                    i.printStackTrace();
+//                }
+//            }
+//            Exec.start();
+//            return;     
+//        }
+//    });
+    
+    void test()
     {
-        @Override
-        public void run()
-        {
-            try
+        ClientHandler CLo = this;
+        class tryout implements Runnable
+        {            
+            ClientHandler CL;
+            public tryout(ClientHandler cl)
             {
-                dos.writeUTF("Select one of the following commands:");
-                dos.writeUTF("1) LIST - Displays list of currenlty active chat rooms");
-                dos.writeUTF("2) CREATE - Create a new chat room and enter it");
-                dos.writeUTF("3) ENTER <Name of chat room> - Enter an existing chat room");
-                String received;
-                received = dis.readUTF();
-                StringTokenizer st = new StringTokenizer(received);
-                String tok = st.nextToken();
-                if(tok.equals("LIST"))
-                {
-                    
-                    dos.writeUTF("Typed LIST");
-                }
-                else if(tok.equals("CREATE"))
-                {
-                    
-                }
-                else if(tok.equals("ENTER"))
-                {
-                    
-                }
+                CL = cl;
             }
-            catch(IOException i)
-            {
-                i.printStackTrace();
+            public void run()
+            {        
+                while(room.equals("lobby"))
+                {
+                    try
+                    {
+                        dos.writeUTF("Select one of the following commands:");
+                        dos.writeUTF("1) LIST - Displays list of currenlty active chat rooms");
+                        dos.writeUTF("2) CREATE - Create a new chat room and enter it");
+                        dos.writeUTF("3) ENTER <Name of chat room> - Enter an existing chat room");
+                        String received;
+                        received = dis.readUTF();
+                        StringTokenizer st = new StringTokenizer(received);
+                        String tok = st.nextToken();
+                        if(tok.equals("LIST"))
+                        {
+                           dos.writeUTF("Typed LIST");
+                           for(Room room: RoomList)
+                           {
+                               dos.writeUTF(room.GetName());                      
+                           }
+                        }
+                        else if(tok.equals("CREATE"))
+                        {
+                            dos.writeUTF("Please Enter Name of the new Room");
+                            String newrname = dis.readUTF();
+                            Room newroom = new Room(newrname);
+                            newroom.AddClient(CL);
+                            RoomList.add(newroom);
+
+                        }
+                        else if(tok.equals("ENTER"))
+                        {
+                            String roomname = st.nextToken();
+                            
+
+                        }
+                        else if(tok.equals("logout"))
+                        {
+                            for (ClientHandler cl : Server.ClientList)
+                            {
+                                if(cl.isloggedin)
+                                    cl.dos.writeUTF(name+" has logged out");
+                            }
+                            isloggedin = false;
+                            s.close();
+                            return;                           
+                        }
+                    }
+                    catch(IOException i)
+                    {
+                        i.printStackTrace();
+                    }
+                }
+                Exec.start();
+                return;     
             }
-            Exec.start();
-            return;     
         }
-    });
+        Thread t = new Thread(new tryout(CLo));
+        t.start();
+    }
     
     Thread Exec = new Thread(new Runnable() 
     {
