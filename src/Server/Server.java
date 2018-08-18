@@ -1,5 +1,10 @@
+// TO ADD
+// 1) Remove Empty chat rooms
+// 2) Datagram Socket receiving on client side/sending from server side
+// 3) tcp file transfers
+
 package Server;
-//Hi!
+
 import java.net.*;
 import java.io.*;
 import java.util.*;
