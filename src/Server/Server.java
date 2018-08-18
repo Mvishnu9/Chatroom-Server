@@ -23,7 +23,9 @@ public class Server
     {
         try
         {
+
             server = new ServerSocket(port);
+            dsocket = new DatagramSocket(port+1);
             System.out.println("Server started");
             Room lobby = new Room("lobby");
             RoomList.add(lobby);
@@ -70,7 +72,7 @@ public class Server
                         }
                         System.out.println("Creating a new handler for this client...");
 
-                        ClientHandler cl = new ClientHandler(socket, dsocket , Name, in, out, RoomList, fis, fos);
+                        ClientHandler cl = new ClientHandler(socket, dsocket, Name, in, out, RoomList, fis, fos);
                         //Thread th = new Thread(cl);
                         cl.RoomLobby();
 
@@ -161,6 +163,7 @@ class ClientHandler
     Vector <Room> RoomList;
     Socket s;
     DatagramSocket ds;
+    private byte[] receive;
     boolean isloggedin;
      
     public ClientHandler(Socket s, DatagramSocket ds, String name,
@@ -182,7 +185,7 @@ class ClientHandler
     {
         return this.name;
     }
-    
+     
     public void Exec() 
     {
         String receivedT;
@@ -218,8 +221,12 @@ class ClientHandler
                             cl.dos.writeUTF(name+" has logged out");
                     }
                     isloggedin = false;
+                    thisRoom.RemoveClient(thisCL);
+                    dos.writeUTF("Successfully logged out");
                     s.close();
-                    break;
+                    dis.close();
+                    dos.close();
+                    return;
                 }
                 else if(tok.equalsIgnoreCase("exit"))
                 {
@@ -263,9 +270,7 @@ class ClientHandler
                                 
                     }
                     dos.writeUTF("Client with associated name doesnt exist.");
-                    continue;
-                   
-                    
+                    continue;                                       
                 }
                 else if(tok.equalsIgnoreCase("list"))
                 {
@@ -277,11 +282,29 @@ class ClientHandler
                     dos.writeUTF("------------------------------------------------------------");
                     continue;                    
                 }
+                else if(receivedT.equalsIgnoreCase("Sending file"))
+                {
+                    receive = new byte[65535];
+                    DatagramPacket DpReceive = new DatagramPacket(receive, receive.length);
+                    ds.receive(DpReceive);
+                    receive = DpReceive.getData();
+                    String P = new String(receive, 0, DpReceive.getLength());
+                    System.out.println(name+" : " + P);
+                    for (ClientHandler cl : thisRoom.ClientList)
+                    {
+                        cl.dos.writeUTF(name+" : "+P);
+                    }
+                }
                 for (ClientHandler cl : thisRoom.ClientList)
                 {
                     cl.dos.writeUTF(name+" : "+receivedT);
                 }
 
+            }
+            catch(SocketException s)
+            {
+                s.printStackTrace();
+                return;
             }
             catch(EOFException e)
             {
@@ -296,17 +319,6 @@ class ClientHandler
             {
                 ex.printStackTrace();
             }
-        }
-
-        try
-        {
-            dis.close();
-            dos.close();
-            return;             
-        }
-        catch(IOException i)
-        {
-            i.printStackTrace();                    
         }
     }
     
@@ -338,8 +350,8 @@ class ClientHandler
                 return;
 
             }
-            public void run()
-            {        
+            private void Selection()
+            {
                 while(room.equals("lobby"))
                 {
                     try
@@ -410,8 +422,11 @@ class ClientHandler
                                 if(cl.isloggedin)
                                     cl.dos.writeUTF(name+" has logged out");
                             }
-                            isloggedin = false;
+                            dos.writeUTF("Successfully logged out");
                             s.close();
+                            dis.close();
+                            dos.close();
+                            isloggedin = false;
                             return;                           
                         }
                         else
@@ -424,7 +439,14 @@ class ClientHandler
                         i.printStackTrace();
                     }
                 }
-                Exec();
+            }
+            public void run()
+            {        
+                Selection();
+                if(thisCL.isloggedin)
+                {
+                    Exec();
+                }
                 return;     
             }
         }
