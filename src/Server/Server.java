@@ -1,7 +1,6 @@
 // TO ADD
-// 1) Remove Empty chat rooms
-// 2) Datagram Socket receiving on client side/sending from server side
-// 3) tcp file transfers
+// 1) Datagram Socket receiving on client side/sending from server side
+// 2) tcp file transfers
 
 package Server;
 
@@ -131,11 +130,13 @@ class Room
 {
     private String name;
     Vector <ClientHandler> ClientList;
+    private int count;
     
     public Room(String name)
     {
         this.name = name;
         this.ClientList = new Vector<>();
+        this.count = 0;
     }
     
     public String GetName()
@@ -143,14 +144,21 @@ class Room
         return(this.name);
     }
     
+    public int GetCount()
+    {
+        return(this.count);
+    }
+    
     public void AddClient(ClientHandler cl)
     {
         this.ClientList.add(cl);
+        count++;
     }
     
     public void RemoveClient(ClientHandler cl)
     {
         this.ClientList.remove(cl);
+        count--;
     }
     
 }
@@ -190,7 +198,18 @@ class ClientHandler
     {
         return this.name;
     }
-     
+    
+    public void DestroyRoom(Room room)
+    {
+        Iterator<Room> iter = RoomList.iterator();
+        while (iter.hasNext()) 
+        {
+            Room r = iter.next();
+            if(r.equals(room))
+                iter.remove();
+        } 
+    }
+    
     public void Exec() 
     {
         String receivedT;
@@ -216,7 +235,7 @@ class ClientHandler
                 StringTokenizer st = new StringTokenizer(receivedT);
                 String tok = st.nextToken();
                 
-                System.out.println(name+": "+receivedT);
+                System.out.println(name+" : "+receivedT);
 
                 if(tok.equals("logout"))
                 {
@@ -237,6 +256,19 @@ class ClientHandler
                 {
                     thisCL.room = "lobby";
                     thisRoom.RemoveClient(thisCL);
+                    if(thisRoom.GetCount() == 0)
+                    {
+                        for (ClientHandler cl : Server.ClientList)
+                        {
+                            if(cl.room.equalsIgnoreCase("lobby"))
+                            {
+                                cl.dos.writeUTF("-----------------------------------------------------------");
+                                cl.dos.writeUTF("The chatroom "+thisRoom.GetName()+" has been deleted due to lack of participants");
+                                cl.dos.writeUTF("-----------------------------------------------------------");
+                            }
+                        }
+                        DestroyRoom(thisRoom);
+                    }
                     for (ClientHandler cl : thisRoom.ClientList)
                     {
                         cl.dos.writeUTF(name+" has left the room");
@@ -290,6 +322,10 @@ class ClientHandler
                 else if(receivedT.equalsIgnoreCase("Sending file"))
                 {
                     receive = new byte[65535];
+                    for (ClientHandler cl : thisRoom.ClientList)
+                    {
+                        cl.dos.writeUTF(name+" : "+receivedT);
+                    }
                     DatagramPacket DpReceive = new DatagramPacket(receive, receive.length);
                     ds.receive(DpReceive);
                     receive = DpReceive.getData();
@@ -299,6 +335,7 @@ class ClientHandler
                     {
                         cl.dos.writeUTF(name+" : "+P);
                     }
+                    continue;
                 }
                 for (ClientHandler cl : thisRoom.ClientList)
                 {
@@ -387,16 +424,23 @@ class ClientHandler
                                 continue;
                             }
                             String newrname = st.nextToken();
+                            Boolean tflag = true;
                             for(Room check: RoomList)
                             {
                                 if(newrname.equalsIgnoreCase(check.GetName()))
                                 {
                                     dos.writeUTF("Name Already Taken");
-                                    continue;
+                                    tflag = false;
                                 }
+                            }
+                            if(!tflag)
+                            {
+                                continue;
                             }
                             Room newroom = new Room(newrname);
                             RoomList.add(newroom);
+                            CL.room = newrname;
+                            newroom.AddClient(CL);                            
                         }
                         else if(tok.equalsIgnoreCase("ENTER"))
                         {
@@ -406,18 +450,25 @@ class ClientHandler
                                 continue;
                             }
                             String roomname = st.nextToken();
-                            CL.room = roomname;
                             Room thisRoom = RoomList.firstElement();
                             Iterator <Room> Iter = RoomList.iterator();
+                            Boolean tflag = false;
                             while(Iter.hasNext())
                             {
                                 Room cRoom = Iter.next();
                                 if(roomname.equals(cRoom.GetName()))
                                 {
                                     thisRoom = cRoom;
+                                    tflag = true;
                                     break;
                                 }
                             }
+                            if(!tflag)
+                            {
+                                dos.writeUTF("Chatroom doesnt exist, please create using CREATE command");
+                                continue;
+                            }
+                            CL.room = roomname;
                             thisRoom.AddClient(CL);                           
                         }
                         else if(tok.equalsIgnoreCase("logout"))
