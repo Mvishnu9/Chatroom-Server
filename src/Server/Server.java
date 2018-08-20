@@ -16,7 +16,8 @@ public class Server
     static int ClientCount = 0;
     
     private Socket socket = null;
-    private DatagramSocket dsocket = null;
+    private DatagramSocket dsocketR = null;
+    private DatagramSocket dsocketS = null;
     private ServerSocket server = null;
     private DataInputStream in = null;
     private DataOutputStream out = null;
@@ -29,7 +30,8 @@ public class Server
         {
 
             server = new ServerSocket(port);
-            dsocket = new DatagramSocket(port+1);
+            dsocketR = new DatagramSocket(port+1);
+            dsocketS = new DatagramSocket();
             System.out.println("Server started");
             Room lobby = new Room("lobby");
             RoomList.add(lobby);
@@ -76,7 +78,7 @@ public class Server
                         }
                         System.out.println("Creating a new handler for this client...");
 
-                        ClientHandler cl = new ClientHandler(socket, dsocket, Name, in, out, RoomList, fis, fos);
+                        ClientHandler cl = new ClientHandler(socket, dsocketR, dsocketS, Name, in, out, RoomList, fis, fos);
                         //Thread th = new Thread(cl);
                         cl.RoomLobby();
 
@@ -175,11 +177,12 @@ class ClientHandler
     private String room;
     Vector <Room> RoomList;
     Socket s;
-    DatagramSocket ds;
+    DatagramSocket dsR;
+    DatagramSocket dsS;
     private byte[] receive;
     boolean isloggedin;
      
-    public ClientHandler(Socket s, DatagramSocket ds, String name,
+    public ClientHandler(Socket s, DatagramSocket ds, DatagramSocket dss, String name,
                             DataInputStream dis, DataOutputStream dos, Vector <Room> RoomList, 
                             FileInputStream fis, FileOutputStream fos) {
         this.dis = dis;
@@ -191,7 +194,8 @@ class ClientHandler
         this.RoomList = RoomList;
         this.fis = fis;
         this.fos = fos;
-        this.ds = ds;
+        this.dsR = ds;
+        this.dsS = dss;
     }
  
     public String GetName()
@@ -321,19 +325,22 @@ class ClientHandler
                 }
                 else if(receivedT.equalsIgnoreCase("Sending file"))
                 {
-                    receive = new byte[65535];
+                    receive = new byte[4096];
                     for (ClientHandler cl : thisRoom.ClientList)
                     {
                         cl.dos.writeUTF(name+" : "+receivedT);
                     }
                     DatagramPacket DpReceive = new DatagramPacket(receive, receive.length);
-                    ds.receive(DpReceive);
+                    dsR.receive(DpReceive);
                     receive = DpReceive.getData();
                     String P = new String(receive, 0, DpReceive.getLength());
                     System.out.println(name+" : " + P);
                     for (ClientHandler cl : thisRoom.ClientList)
                     {
-                        cl.dos.writeUTF(name+" : "+P);
+                        InetAddress ina = cl.s.getInetAddress();
+                        DatagramPacket DpSend = new DatagramPacket(receive, receive.length, ina, 5003);
+                        dsS.send(DpSend);
+//                        cl.dos.writeUTF(name+" : "+P);
                     }
                     continue;
                 }
