@@ -1,6 +1,3 @@
-// TO ADD
-// 1) Datagram Socket receiving on client side/sending from server side
-// 2) tcp file transfers
 
 package Server;
 
@@ -323,7 +320,7 @@ class ClientHandler
                     dos.writeUTF("------------------------------------------------------------");
                     continue;                    
                 }
-                else if(receivedT.equalsIgnoreCase("Sending file"))
+                else if(receivedT.equalsIgnoreCase("Sending file UDP"))
                 {
                     receive = new byte[4096];
                     for (ClientHandler cl : thisRoom.ClientList)
@@ -341,6 +338,24 @@ class ClientHandler
                         DatagramPacket DpSend = new DatagramPacket(receive, receive.length, ina, 5003);
                         dsS.send(DpSend);
 //                        cl.dos.writeUTF(name+" : "+P);
+                    }
+                    continue;
+                }
+                else if(receivedT.equalsIgnoreCase("Sending file TCP"))
+                {
+                    receive = new byte[4096];
+                    for (ClientHandler cl : thisRoom.ClientList)
+                    {
+                        cl.dos.writeUTF(name+" : "+receivedT);
+                    }
+                    int count;
+                    while((count = dis.read(receive))!= -1)
+                    {
+                        for (ClientHandler cl : thisRoom.ClientList)
+                        {
+                            cl.dos.write(receive);
+                        }
+                        receive = new byte[4096];
                     }
                     continue;
                 }
