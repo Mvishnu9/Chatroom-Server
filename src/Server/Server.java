@@ -13,13 +13,16 @@ public class Server
     static int ClientCount = 0;
     
     private Socket socket = null;
+    private Socket Fsocket = null;
     private DatagramSocket dsocketR = null;
     private DatagramSocket dsocketS = null;
     private ServerSocket server = null;
+    private ServerSocket Fserver = null;
     private DataInputStream in = null;
     private DataOutputStream out = null;
-    private FileInputStream fis = null;
-    private FileOutputStream fos = null;
+    private DataInputStream Fin = null;
+    private DataOutputStream Fout = null;
+
  
     public Server(int port)
     {
@@ -27,6 +30,7 @@ public class Server
         {
 
             server = new ServerSocket(port);
+            Fserver = new ServerSocket(5004);
             dsocketR = new DatagramSocket(port+1);
             dsocketS = new DatagramSocket();
             System.out.println("Server started");
@@ -48,10 +52,13 @@ public class Server
                     while(true)
                     {
                         socket = server.accept();
+                        Fsocket = Fserver.accept();
                         System.out.println("New client request received : " + socket);
 
                         in = new DataInputStream(socket.getInputStream());
                         out = new DataOutputStream(socket.getOutputStream());
+                        Fin = new DataInputStream(Fsocket.getInputStream());
+                        Fout = new DataOutputStream(Fsocket.getOutputStream());
                         
 
                         String Name = "";
@@ -75,7 +82,7 @@ public class Server
                         }
                         System.out.println("Creating a new handler for this client...");
 
-                        ClientHandler cl = new ClientHandler(socket, dsocketR, dsocketS, Name, in, out, RoomList, fis, fos);
+                        ClientHandler cl = new ClientHandler(socket, dsocketR, dsocketS, Name, in, out, RoomList, Fin, Fout);
                         //Thread th = new Thread(cl);
                         cl.RoomLobby();
 
@@ -169,8 +176,8 @@ class ClientHandler
     private String name;
     final DataInputStream dis;
     final DataOutputStream dos;
-    final FileInputStream fis;
-    final FileOutputStream fos;
+    final DataInputStream fis;
+    final DataOutputStream fos;
     private String room;
     Vector <Room> RoomList;
     Socket s;
@@ -181,7 +188,7 @@ class ClientHandler
      
     public ClientHandler(Socket s, DatagramSocket ds, DatagramSocket dss, String name,
                             DataInputStream dis, DataOutputStream dos, Vector <Room> RoomList, 
-                            FileInputStream fis, FileOutputStream fos) {
+                            DataInputStream fis, DataOutputStream fos) {
         this.dis = dis;
         this.dos = dos;
         this.name = name;
@@ -234,6 +241,14 @@ class ClientHandler
             {
                 receivedT = dis.readUTF();
                 StringTokenizer st = new StringTokenizer(receivedT);
+                StringTokenizer st2 = new StringTokenizer(receivedT, ":");
+                String tok2 = "";
+                int ct = st2.countTokens();
+                if(ct == 3)
+                {
+                    tok2 = st2.nextToken();
+                }
+
                 String tok = st.nextToken();
                 
                 System.out.println(name+" : "+receivedT);
@@ -320,8 +335,12 @@ class ClientHandler
                     dos.writeUTF("------------------------------------------------------------");
                     continue;                    
                 }
-                else if(receivedT.equalsIgnoreCase("Sending file UDP"))
+                else if((ct == 3) && (tok2.equalsIgnoreCase("Sending file UDP ")))
                 {
+                    String Len = st2.nextToken();
+                    Len = st2.nextToken();
+                    Long len = Long.parseLong(Len);
+                    System.out.println("Length "+Len);
                     receive = new byte[4096];
                     for (ClientHandler cl : thisRoom.ClientList)
                     {
@@ -341,21 +360,30 @@ class ClientHandler
                     }
                     continue;
                 }
-                else if(receivedT.equalsIgnoreCase("Sending file TCP"))
+                else if((ct == 3) && (tok2.equalsIgnoreCase("Sending file TCP ")))
                 {
+                    String Len = st2.nextToken();
+                    Len = st2.nextToken();
+                    Long len = Long.parseLong(Len);
+                    System.out.println("Length of file = "+Len);
                     receive = new byte[4096];
                     for (ClientHandler cl : thisRoom.ClientList)
                     {
                         cl.dos.writeUTF(name+" : "+receivedT);
                     }
                     int count;
-                    while((count = dis.read(receive))!= -1)
+                    while((len>0)&&((count = fis.read(receive))>0))
                     {
+                        len = len - 4096;
                         for (ClientHandler cl : thisRoom.ClientList)
                         {
-                            cl.dos.write(receive);
+                            cl.fos.write(receive);
                         }
                         receive = new byte[4096];
+                    }
+                    for (ClientHandler cl : thisRoom.ClientList)
+                    {
+                        cl.fos.flush();
                     }
                     continue;
                 }
@@ -504,6 +532,8 @@ class ClientHandler
                             s.close();
                             dis.close();
                             dos.close();
+                            fis.close();
+                            fos.close();
                             isloggedin = false;
                             return;                           
                         }
